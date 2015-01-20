@@ -85,7 +85,7 @@ implements ApplicationContextAware
     log.debug("lazyInit");
     try {
       File defaultProps = new File("broker.properties");
-      log.info("adding " + defaultProps.getName());
+      //log.info("adding " + defaultProps.getName());
       config.addConfiguration(new PropertiesConfiguration(defaultProps));
     }
     catch (Exception e1) {
@@ -97,7 +97,7 @@ implements ApplicationContextAware
       Resource[] xmlResources = context.getResources("classpath*:config/properties.xml");
       for (Resource xml : xmlResources) {
         if (validXmlResource(xml)) {
-          log.info("loading config from " + xml.getURI());
+          //log.info("loading config from " + xml.getURI());
           XMLConfiguration xconfig = new XMLConfiguration();
           xconfig.load(xml.getInputStream());
           config.addConfiguration(xconfig);
@@ -109,7 +109,7 @@ implements ApplicationContextAware
           if (null == prop) {
             log.error("Null resource");
           }
-          log.info("loading config from " + prop.getURI());
+          //log.info("loading config from " + prop.getURI());
           PropertiesConfiguration pconfig = new PropertiesConfiguration();
           pconfig.load(prop.getInputStream());
           config.addConfiguration(pconfig);
@@ -201,7 +201,7 @@ implements ApplicationContextAware
   private boolean validXmlResource (Resource xml)
   {
     try {
-      log.info("Validating resource " + xml.getURI());
+      //log.info("Validating resource " + xml.getURI());
       String path = xml.getURI().toString();
       for (String regex : excludedPaths) {
         if (path.matches(regex)) {

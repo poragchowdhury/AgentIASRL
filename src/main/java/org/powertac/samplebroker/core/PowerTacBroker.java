@@ -224,8 +224,8 @@ implements BrokerContext
       if (method.getName().equals("handleMessage")) {
         Class<?>[] args = method.getParameterTypes();
         if (1 == args.length) {
-          log.info("Register " + thing.getClass().getSimpleName()
-                   + ".handleMessage(" + args[0].getSimpleName() + ")");
+          //log.info("Register " + thing.getClass().getSimpleName()
+          //         + ".handleMessage(" + args[0].getSimpleName() + ")");
           router.registerMessageHandler(thing, args[0]);
         }
       }
@@ -256,7 +256,7 @@ implements BrokerContext
     jmsManagementService.init(jmsBrokerUrl, serverQueueName);
     jmsManagementService.registerMessageListener(brokerMessageReceiver,
                                                  brokerQueueName);
-    log.info("Listening on queue " + brokerQueueName);
+    //log.info("Listening on queue " + brokerQueueName);
 
     // Log in to server.
     // In case the server does not respond within  second
@@ -276,7 +276,7 @@ implements BrokerContext
           break;
         }
         catch (Exception ex) {
-          log.info("log attempt failed " + ex.toString());
+          //log.info("log attempt failed " + ex.toString());
           try {
             Thread.sleep(loginRetryTimeout);
           }
@@ -437,10 +437,10 @@ implements BrokerContext
         }
       }
       else {
-        log.info("Server does not provide system time - cannot adjust offset");
+        //log.info("Server does not provide system time - cannot adjust offset");
       }
-      log.info("login response = " + response
-               + ", server clock offset = " + serverClockOffset);
+      //log.info("login response = " + response
+      //         + ", server clock offset = " + serverClockOffset);
     }
     notifyAll();
   }
@@ -462,7 +462,7 @@ implements BrokerContext
     for (String brokerName : comp.getBrokers()) {
       if (!(brokerName.equals(adapter.getUsername()))) {
         Broker competitor = new Broker(brokerName);
-        log.info("adding competitor " + brokerName);
+        //log.info("adding competitor " + brokerName);
         brokerRepo.add(competitor);
       }
     }
@@ -475,7 +475,7 @@ implements BrokerContext
     // now set time to end of bootstrap period.
     timeService.setClockParameters(comp.getClockParameters());
     timeService.init(bootBaseTime.plus(bootTimeslotCount * comp.getTimeslotDuration()));
-    log.info("Sim start time: " + timeService.getCurrentDateTime().toString());
+    //log.info("Sim start time: " + timeService.getCurrentDateTime().toString());
   }
 
   /**
@@ -485,7 +485,7 @@ implements BrokerContext
   public void handleMessage (SimPause sp)
   {
     // local brokers can ignore this.
-    log.info("Paused at " + timeService.getCurrentDateTime().toString());
+    //log.info("Paused at " + timeService.getCurrentDateTime().toString());
     pausedAt = timeslotRepo.currentSerialNumber();
   }
 
@@ -495,7 +495,7 @@ implements BrokerContext
   public void handleMessage (SimResume sr)
   {
     // local brokers don't need to handle this
-    log.info("Resumed");
+    //log.info("Resumed");
     pausedAt = 0;
     timeService.setStart(sr.getStart().getMillis() - serverClockOffset);
     timeService.updateTime();
@@ -508,10 +508,10 @@ implements BrokerContext
    */
   public void handleMessage (SimStart ss)
   {
-    log.info("SimStart - start time is " + ss.getStart().toString());
+    //log.info("SimStart - start time is " + ss.getStart().toString());
     timeService.setStart(ss.getStart().getMillis() - serverClockOffset);
     timeService.updateTime();
-    log.info("SimStart - clock set to " + timeService.getCurrentDateTime().toString());
+    //log.info("SimStart - clock set to " + timeService.getCurrentDateTime().toString());
   }
 
   /**
@@ -519,7 +519,7 @@ implements BrokerContext
    */
   public synchronized void handleMessage (SimEnd se)
   {
-    log.info("SimEnd received");
+    //log.info("SimEnd received");
     running = false;
     notifyAll();
   }
@@ -534,7 +534,7 @@ implements BrokerContext
   {
     Timeslot old = timeslotRepo.currentTimeslot();
     timeService.updateTime(); // here is the clock update
-    log.info("TimeslotUpdate at " + timeService.getCurrentDateTime().toString());
+    //log.info("TimeslotUpdate at " + timeService.getCurrentDateTime().toString());
     //List<Timeslot> enabled = tu.getEnabled();
     for (int index = old.getSerialNumber();
          index < tu.getFirstEnabled();
@@ -635,13 +635,13 @@ implements BrokerContext
       while (true) {
         timeslotIndex = waitForActivation(timeslotIndex);
         if (!running) {
-          log.info("worker thread exits at ts " + timeslotIndex);
+          //log.info("worker thread exits at ts " + timeslotIndex);
           return;
         }
 
         Timeslot current = timeslotRepo.currentTimeslot();
-        log.info("activate at " + timeService.getCurrentDateTime().toString()
-                 + ", timeslot " + current.getSerialNumber());
+        //log.info("activate at " + timeService.getCurrentDateTime().toString()
+        //         + ", timeslot " + current.getSerialNumber());
         List<Activatable> services =
             SpringApplicationContext.listBeansOfType(Activatable.class);
         for (Activatable svc : services) {
@@ -672,7 +672,7 @@ implements BrokerContext
     @Override
     public void receiveMessage (Object msg)
     {
-      //log.info("receive " + msg.toString());
+      ////log.info("receive " + msg.toString());
       if (msg != null) {
         // ignore all incoming messages until enabled.
         if (!(isEnabled() || msg instanceof BrokerAccept))

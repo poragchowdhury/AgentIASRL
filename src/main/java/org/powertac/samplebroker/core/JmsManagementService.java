@@ -98,7 +98,7 @@ public class JmsManagementService {
   public void registerMessageListener(MessageListener listener,
                                       String destinationName)
   {
-    log.info("registerMessageListener(" + destinationName + ", " + listener + ")");
+    //log.info("registerMessageListener(" + destinationName + ", " + listener + ")");
     container = new DefaultMessageListenerContainer();
     container.setConnectionFactory(connectionFactory);
     container.setDestinationName(destinationName);

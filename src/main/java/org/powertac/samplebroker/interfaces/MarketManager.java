@@ -30,5 +30,5 @@ public interface MarketManager
    * Returns the mean price observed in the market
    */
   public double getMeanMarketPrice ();
-  public double getMaxMarketPrice (int index);
+  public double getAvgMarketPrice (int index);
 }

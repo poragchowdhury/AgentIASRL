@@ -113,8 +113,8 @@ public class BrokerTournamentService
       String restResponseType = "type=" + this.responseType;
       String finalUrl = tsUrl + "?" + restAuthToken + "&" + restTourneyName + "&"
               + restResponseType;
-      log.info("Connecting to TS with " + finalUrl);
-      log.info("Tournament : " + this.tourneyName);
+      //log.info("Connecting to TS with " + finalUrl);
+      //log.info("Tournament : " + this.tourneyName);
 
       URL url = new URL(finalUrl);
       URLConnection conn = url.openConnection();
@@ -141,8 +141,8 @@ public class BrokerTournamentService
         if (retryNode != null) {
           String checkRetry = retryNode.getFirstChild()
                   .getNodeValue();
-          log.info("Retry message received for : " + checkRetry
-                   + " seconds");
+          //log.info("Retry message received for : " + checkRetry
+          //         + " seconds");
           System.out.println("Retry message received for : "
                   + checkRetry + " seconds");
           // Received retry message spin and try again
@@ -151,19 +151,19 @@ public class BrokerTournamentService
         }
         else if (loginNode != null) {
           System.out.println("Login response received!");
-          log.info("Login response received! ");
+          //log.info("Login response received! ");
 
           String checkJmsUrl = doc.getElementsByTagName("jmsUrl").item(0).getFirstChild().getNodeValue();
           jmsUrl = checkJmsUrl;
-          log.info("jmsUrl=" + checkJmsUrl);
+          //log.info("jmsUrl=" + checkJmsUrl);
 
           String checkBrokerQueue = doc.getElementsByTagName("queueName").item(0).getFirstChild().getNodeValue();
           brokerQueueName = checkBrokerQueue;
-          log.info("brokerQueueName=" + checkBrokerQueue);
+          //log.info("brokerQueueName=" + checkBrokerQueue);
 
           String checkServerQueue = doc.getElementsByTagName("serverQueue").item(0).getFirstChild().getNodeValue();
           serverQueueName = checkServerQueue;
-          log.info("serverQueueName=" + checkServerQueue);
+          //log.info("serverQueueName=" + checkServerQueue);
 
           System.out.printf("Login message receieved!\n  jmsUrl=%s\n  queueName=%s\n  serverQueue=%s\n",
                             checkJmsUrl, checkBrokerQueue, checkServerQueue);
@@ -227,7 +227,7 @@ public class BrokerTournamentService
         System.out.println("Tournament : " + tourneyName);
 
         if (loginMaybe(tsUrl)) {
-          log.info("Login Successful!");
+          //log.info("Login Successful!");
           return true;
         }
       }

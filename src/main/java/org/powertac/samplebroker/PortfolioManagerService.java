@@ -131,7 +131,7 @@ implements PortfolioManager, Initializable, Activatable
 //  @SuppressWarnings("unchecked")
   public void initialize (BrokerContext context)
   {
-	  log.info("initializing PortfolioManagerService -Porag");
+	  //log.info("initializing PortfolioManagerService -Porag");
     this.brokerContext = context;
     propertiesService.configureMe(this);
     customerProfiles = new HashMap<PowerType,
@@ -255,15 +255,15 @@ implements PortfolioManager, Initializable, Activatable
   {
     Broker theBroker = spec.getBroker();
     if (brokerContext.getBrokerUsername().equals(theBroker.getUsername())) {
-      if (theBroker != brokerContext.getBroker())
+      //if (theBroker != brokerContext.getBroker())
         // strange bug, seems harmless for now
-        log.info("Resolution failed for broker " + theBroker.getUsername());
+        //log.info("Resolution failed for broker " + theBroker.getUsername());
       // if it's ours, just log it, because we already put it in the repo
       TariffSpecification original =
               tariffRepo.findSpecificationById(spec.getId());
       if (null == original)
         log.error("Spec " + spec.getId() + " not in local repo");
-      log.info("published " + spec);
+      //log.info("published " + spec);
     }
     else {
       // otherwise, keep track of competing tariffs, and record in the repo
@@ -278,7 +278,7 @@ implements PortfolioManager, Initializable, Activatable
    */
   public synchronized void handleMessage (TariffStatus ts)
   {
-    log.info("TariffStatus: " + ts.getStatus());
+    //log.info("TariffStatus: " + ts.getStatus());
   }
   
   /**
@@ -337,12 +337,12 @@ implements PortfolioManager, Initializable, Activatable
   public synchronized void handleMessage (TariffRevoke tr)
   {
     Broker source = tr.getBroker();
-    log.info("Revoke tariff " + tr.getTariffId()
-             + " from " + tr.getBroker().getUsername());
+    //log.info("Revoke tariff " + tr.getTariffId()
+    //         + " from " + tr.getBroker().getUsername());
     // if it's from some other broker, we need to remove it from the
     // tariffRepo, and from the competingTariffs list
     if (!(source.getUsername().equals(brokerContext.getBrokerUsername()))) {
-      log.info("clear out competing tariff");
+      //log.info("clear out competing tariff");
       TariffSpecification original =
               tariffRepo.findSpecificationById(tr.getTariffId());
       if (null == original) {
@@ -366,7 +366,7 @@ implements PortfolioManager, Initializable, Activatable
    */
   public synchronized void handleMessage (BalancingControlEvent bce)
   {
-    log.info("BalancingControlEvent " + bce.getKwh());
+    //log.info("BalancingControlEvent " + bce.getKwh());
   }
 
   // --------------- activation -----------------
@@ -377,7 +377,7 @@ implements PortfolioManager, Initializable, Activatable
   @Override // from Activatable
   public synchronized void activate (int timeslotIndex)
   {
-	  log.info("activate in PortfolioManagerService -Porag timeslotIndex : " + timeslotIndex);
+	  //log.info("activate in PortfolioManagerService -Porag timeslotIndex : " + timeslotIndex);
     if (customerSubscriptions.size() == 0) {
       // we (most likely) have no tariffs
       createInitialTariffs();
@@ -392,10 +392,10 @@ implements PortfolioManager, Initializable, Activatable
   // fixed-rate two-part tariffs that give the broker a fixed margin.
   private void createInitialTariffs ()
   {
-	  log.info("Creating new tariff -Porag");
+	  //log.info("Creating new tariff -Porag");
     // remember that market prices are per mwh, but tariffs are by kwh
     double marketPrice = marketManager.getMeanMarketPrice() / 1000.0;
-    log.info("meanMarketPrice -Porag : " + marketPrice);
+    //log.info("meanMarketPrice -Porag : " + marketPrice);
     // for each power type representing a customer population,
     // create a tariff that's better than what's available
     for (PowerType pt : customerProfiles.keySet()) {
@@ -410,13 +410,13 @@ implements PortfolioManager, Initializable, Activatable
         rateValue *= 0.7; // Magic number!! price break for interruptible
       }
       
-      log.info("RateValue for new tariff -Porag : " + rateValue);
+      //log.info("RateValue for new tariff -Porag : " + rateValue);
       
       TariffSpecification spec =
           new TariffSpecification(brokerContext.getBroker(), pt)
               .withPeriodicPayment(defaultPeriodicPayment);
       
-      log.info("Default periodic payment for new tariff -Porag : " + defaultPeriodicPayment);
+      //log.info("Default periodic payment for new tariff -Porag : " + defaultPeriodicPayment);
       
       Rate rate = new Rate().withValue(rateValue);
       if (pt.isInterruptible()) {
@@ -440,7 +440,7 @@ implements PortfolioManager, Initializable, Activatable
   // Checks to see whether our tariffs need fine-tuning
   private void improveTariffs()
   {
-	  log.info("Improving tariff -Porag");
+	  //log.info("Improving tariff -Porag");
     // quick magic-number hack to inject a balancing order
     int timeslotIndex = timeslotRepo.currentTimeslot().getSerialNumber();
     if (371 == timeslotIndex) {
@@ -451,7 +451,7 @@ implements PortfolioManager, Initializable, Activatable
                                                     spec, 
                                                     0.5,
                                                     spec.getRates().get(0).getMinValue() * 0.9);
-          log.info("Sending balancing order -Porag");
+          //log.info("Sending balancing order -Porag");
           brokerContext.sendMessage(order);
         }
         else if (spec.hasRegulationRate()) {
@@ -463,15 +463,16 @@ implements PortfolioManager, Initializable, Activatable
                                                  spec, 1.0, up * 0.5);
           BalancingOrder bdown = new BalancingOrder(brokerContext.getBroker(),
                                                     spec, -1.0, down * 0.9);
-          log.info("Sending balancing order -Porag");
+          //log.info("Sending balancing order -Porag");
           brokerContext.sendMessage(bup);
           brokerContext.sendMessage(bdown);
         }
       }
     }
     // magic-number hack to supersede a tariff
-    if (timeslotIndex % 24 == 0) {
+    if (timeslotIndex % 12 == 0) {
     	// find the existing CONSUMPTION tariff
+    	log.info("Revoking Tariff");
         TariffSpecification oldc = null;
         List<TariffSpecification> candidates =
           tariffRepo.findTariffSpecificationsByBroker(brokerContext.getBroker());
@@ -489,9 +490,11 @@ implements PortfolioManager, Initializable, Activatable
             log.warn("No CONSUMPTION tariffs found");
           }
           else {
-            double rateValue = marketManager.getMaxMarketPrice(timeslotIndex)/1000;
+            double avgLimitPrice = marketManager.getAvgMarketPrice(timeslotIndex)/1000;
+            double rateValue = (avgLimitPrice-0.05) * 1.3;
+            log.info("avg limit price from market manager " + avgLimitPrice + " and tariff rate is " + rateValue + " in timeslot "+ timeslotIndex );
             // create a new CONSUMPTION tariff
-            log.info("Working! -Porag");
+            //log.info("Working! -Porag");
             TariffSpecification spec =
               new TariffSpecification(brokerContext.getBroker(),
                                       PowerType.CONSUMPTION)
@@ -507,7 +510,7 @@ implements PortfolioManager, Initializable, Activatable
             TariffRevoke revoke =
               new TariffRevoke(brokerContext.getBroker(), oldc);
             brokerContext.sendMessage(revoke);
-            log.info("Working fine! -Porag");
+            //log.info("Tariff revoked Working fine! -Porag");
             
           }
         }

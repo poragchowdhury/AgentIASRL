@@ -92,7 +92,7 @@ implements MarketManager, Initializable, Activatable
 
   // Bid recording
   private HashMap<Integer, Order> lastOrder;
-  private HashMap<Integer, Double> lastOrderPrice;
+  private HashMap<Integer, MarketRecord> lastOrderPrice;
   private double[] marketMWh;
   private double[] marketPrice;
   private double meanMarketPrice = 0.0;
@@ -112,10 +112,10 @@ implements MarketManager, Initializable, Activatable
   @Override
   public void initialize (BrokerContext broker)
   {
-	  //log.info("initializing MarketManagerService -Porag");
+	  ////log.info("initializing MarketManagerService -Porag");
     this.broker = broker;
     lastOrder = new HashMap<Integer, Order>();
-    lastOrderPrice = new HashMap<Integer, Double>();
+    lastOrderPrice = new HashMap<Integer, MarketRecord>();
     propertiesService.configureMe(this);
     //marketTxMap = new HashMap<Integer, ArrayList<MarketTransaction>>();
     //weather = new ArrayList<WeatherReport>();
@@ -132,9 +132,10 @@ implements MarketManager, Initializable, Activatable
   }
   
   @Override
-  public double getMaxMarketPrice (int index)
+  public double getAvgMarketPrice (int index)
   {
-	  return lastOrderPrice.get(index);
+	  MarketRecord marketRecord = lastOrderPrice.get(index);
+	  return marketRecord.getAvgCost();
   }
   
   // --------------- message handling -----------------
@@ -153,7 +154,7 @@ implements MarketManager, Initializable, Activatable
    */
   public synchronized void handleMessage (BalancingTransaction tx)
   {
-    //log.info("Balancing tx: " + tx.getCharge());
+    ////log.info("Balancing tx: " + tx.getCharge());
   }
 
   /**
@@ -169,7 +170,7 @@ implements MarketManager, Initializable, Activatable
    */
   public synchronized void handleMessage (DistributionTransaction dt)
   {
-    //log.info("Distribution tx: " + dt.getCharge());
+    ////log.info("Distribution tx: " + dt.getCharge());
   }
 
   /**
@@ -179,7 +180,7 @@ implements MarketManager, Initializable, Activatable
    */
   public void handleMessage (MarketBootstrapData data)
   {
-	  //log.info("MarketBootstrapData -Porag");
+	  ////log.info("MarketBootstrapData -Porag");
     marketMWh = new double[broker.getUsageRecordLength()];
     marketPrice = new double[broker.getUsageRecordLength()];
     double totalUsage = 0.0;
@@ -203,7 +204,7 @@ implements MarketManager, Initializable, Activatable
       }
     }
     meanMarketPrice = totalValue / totalUsage;
-    log.info("Calculated meanMarketPrice : " + meanMarketPrice);
+    //log.info("Calculated meanMarketPrice : " + meanMarketPrice);
   }
 
   /**
@@ -223,10 +224,28 @@ implements MarketManager, Initializable, Activatable
   {
     // reset price escalation when a trade fully clears.
     Order lastTry = lastOrder.get(tx.getTimeslotIndex());
-    Double maxLimitPrice = lastOrderPrice.get(tx.getTimeslotIndex());
-    Double limitPrice = tx.getPrice()/tx.getMWh();
-    if (maxLimitPrice < limitPrice)
-    	lastOrderPrice.put(tx.getTimeslotIndex(), limitPrice);
+    
+    MarketRecord marketRecord = lastOrderPrice.get(tx.getTimeslotIndex());
+    double price = tx.getPrice(); 
+    double energy = tx.getMWh();
+	int timeslot = tx.getTimeslotIndex();
+	//log.info("limit price  : " + limitPrice);
+	if (marketRecord == null)// || limitPrice < maxLimitPrice)
+	{
+		marketRecord = new MarketRecord(price, energy);
+	}
+	else
+	{
+		marketRecord.increaseTotalPriceEnergy(price, energy); 
+	}
+		//log.info("Added this limit price as lastOrderPrice  : " + limitPrice);
+	
+	lastOrderPrice.put(timeslot, marketRecord);
+	log.info("In cleared market transaction: totalPrice " + marketRecord.getTotalPrice() + " totalEnergy: " +  marketRecord.getTotalEnergy() + " for timeslot " + timeslot + " at current timeslot " + timeslotRepo.currentTimeslot().getSerialNumber()); 
+	
+	
+	//	log.info("lastOrderPrice remained unchanged for timeslot : " + timeslot);
+	
     if (lastTry == null) // should not happen
       log.error("order corresponding to market tx " + tx + " is null");
     else if (tx.getMWh() == lastTry.getMWh()) // fully cleared
@@ -265,7 +284,7 @@ implements MarketManager, Initializable, Activatable
   @Override
   public synchronized void activate (int timeslotIndex)
   {
-	  log.info("activate in MarketManagerService -Porag timeslotIndex : " + timeslotIndex);
+	  //log.info("activate in MarketManagerService -Porag timeslotIndex : " + timeslotIndex);
     double neededKWh = 0.0;
     log.debug("Current timeslot is " + timeslotRepo.currentTimeslot().getSerialNumber());
     for (Timeslot timeslot : timeslotRepo.enabledTimeslots()) {
@@ -287,16 +306,14 @@ implements MarketManager, Initializable, Activatable
     if (posn != null)
       neededMWh -= posn.getOverallBalance();
     if (Math.abs(neededMWh) <= minMWh) {
-      log.info("no power required in timeslot " + timeslot);
+      //log.info("no power required in timeslot " + timeslot);
       return;
     }
     Double limitPrice = computeLimitPrice(timeslot, neededMWh);
-    log.info("new order for " + neededMWh + " at " + limitPrice +
-             " in timeslot " + timeslot);
+    //log.info("new order for " + neededMWh + " at " + limitPrice +
+    //         " in timeslot " + timeslot);
     Order order = new Order(broker.getBroker(), timeslot, neededMWh, limitPrice);
     lastOrder.put(timeslot, order);
-    log.info("Adding limit price to timeslot : "+ limitPrice + "E "+ timeslot );
-    lastOrderPrice.put(timeslot, limitPrice);
     broker.sendMessage(order);
   }
 
@@ -348,4 +365,41 @@ implements MarketManager, Initializable, Activatable
     else
       return null; // market order
   }
+}
+
+class MarketRecord
+{
+	double totalPrice;
+	double totalEnergy;
+
+	public MarketRecord() {
+		this.totalPrice = 0;
+		this.totalEnergy = 0;
+	}
+	
+	public MarketRecord(double price, double energy) {
+		this.totalPrice = price;
+		this.totalEnergy = energy;
+	}
+		
+	public void setTotalPrice(double price){
+		this.totalPrice = price;
+	}
+	public void setTotalEnergy(double energy){
+		this.totalEnergy = energy;
+	}
+	public double getTotalPrice(){
+		return this.totalPrice;
+	}
+	public double getTotalEnergy(){
+		return this.totalEnergy;
+	}
+	public double getAvgCost(){
+		return totalPrice/totalEnergy;
+	}
+	public void increaseTotalPriceEnergy(double price, double energy){
+		this.totalPrice += price;
+		this.totalEnergy += energy;
+	}
+	
 }

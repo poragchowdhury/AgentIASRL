@@ -115,7 +115,7 @@ public class MessageDispatcher
     if (!validateId(message))
       return;
     final String text = key + converter.toXML(message);
-    log.info("sending text: \n" + text);
+    //log.info("sending text: \n" + text);
 
     template.send(jmsManagementService.getServerQueueName(),
                   new MessageCreator() {
