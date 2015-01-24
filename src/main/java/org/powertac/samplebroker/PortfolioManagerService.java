@@ -113,7 +113,7 @@ implements PortfolioManager, Initializable, Activatable
   @ConfigurableValue(valueType = "Double",
           description = "Default daily meter charge")
   private double defaultPeriodicPayment = -1.0;
-
+  private int startTimeSlot = 0;
   /**
    * Default constructor registers for messages, must be called after 
    * message router is available.
@@ -378,7 +378,10 @@ implements PortfolioManager, Initializable, Activatable
   public synchronized void activate (int timeslotIndex)
   {
 	  //log.info("activate in PortfolioManagerService -Porag timeslotIndex : " + timeslotIndex);
-    if (customerSubscriptions.size() == 0) {
+	if (startTimeSlot == 0){
+    	startTimeSlot = timeslotIndex;
+    }
+	if (customerSubscriptions.size() == 0) {
       // we (most likely) have no tariffs
       createInitialTariffs();
     }
@@ -470,7 +473,7 @@ implements PortfolioManager, Initializable, Activatable
       }
     }
     // magic-number hack to supersede a tariff
-    if (timeslotIndex % 12 == 0) {
+    if ((timeslotIndex-startTimeSlot) % 12 == 0) {
     	// find the existing CONSUMPTION tariff
     	log.info("Revoking Tariff");
         TariffSpecification oldc = null;

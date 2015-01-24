@@ -93,9 +93,11 @@ implements MarketManager, Initializable, Activatable
   // Bid recording
   private HashMap<Integer, Order> lastOrder;
   private HashMap<Integer, MarketRecord> lastOrderPrice;
+  private HashMap<Integer, MarketClearingPrice> marketClearingPriceHistory;
   private double[] marketMWh;
   private double[] marketPrice;
   private double meanMarketPrice = 0.0;
+  private int startTimeSlot = 0;
 
   //private HashMap<Integer, ArrayList<MarketTransaction>> marketTxMap;
   //private ArrayList<WeatherReport> weather;
@@ -116,6 +118,7 @@ implements MarketManager, Initializable, Activatable
     this.broker = broker;
     lastOrder = new HashMap<Integer, Order>();
     lastOrderPrice = new HashMap<Integer, MarketRecord>();
+    marketClearingPriceHistory = new HashMap<Integer, MarketClearingPrice>();
     propertiesService.configureMe(this);
     //marketTxMap = new HashMap<Integer, ArrayList<MarketTransaction>>();
     //weather = new ArrayList<WeatherReport>();
@@ -243,7 +246,6 @@ implements MarketManager, Initializable, Activatable
 	lastOrderPrice.put(timeslot, marketRecord);
 	log.info("In cleared market transaction: totalPrice " + marketRecord.getTotalPrice() + " totalEnergy: " +  marketRecord.getTotalEnergy() + " for timeslot " + timeslot + " at current timeslot " + timeslotRepo.currentTimeslot().getSerialNumber()); 
 	
-	
 	//	log.info("lastOrderPrice remained unchanged for timeslot : " + timeslot);
 	
     if (lastTry == null) // should not happen
@@ -258,6 +260,37 @@ implements MarketManager, Initializable, Activatable
   public synchronized void handleMessage (Orderbook orderbook)
   {
     // implement something here.
+	int timeslotindex;
+  	int currenttimeslotindex;
+  	double clearingprice;
+  	currenttimeslotindex = timeslotRepo.currentTimeslot().getSerialNumber();
+	timeslotindex = orderbook.getTimeslotIndex();
+	try{
+	clearingprice = orderbook.getClearingPrice();
+	}
+	catch(NullPointerException ex)
+	{
+		clearingprice = 0.0;
+	}
+	
+	int hours;
+    int days;
+    int weekday;
+    int simtimeslot = (timeslotindex - startTimeSlot);
+    hours = simtimeslot % 24;
+    days = simtimeslot / 24;
+    weekday = days % 7;
+    //log.info("Getting orderbook clearing price " + clearingprice + " for timeslot " + timeslotindex + " set it to day no "+ days +" weekday no " + weekday + " and hour " + hours);
+
+    MarketClearingPrice marketClearingPrice = marketClearingPriceHistory.get(weekday);
+    if (marketClearingPrice == null)// || limitPrice < maxLimitPrice)
+	{
+    	marketClearingPrice = new MarketClearingPrice(startTimeSlot);
+	}
+    marketClearingPrice.setMarketClearingPrice(currenttimeslotindex, timeslotindex, clearingprice);
+    //log.info("Setting orderbook clearing price " + marketClearingPrice.getMarketClearingPrice(currenttimeslotindex, timeslotindex) + " for timeslot " + timeslotindex);
+    marketClearingPriceHistory.put(weekday, marketClearingPrice);
+
   }
   
   /**
@@ -291,6 +324,10 @@ implements MarketManager, Initializable, Activatable
       int index = (timeslot.getSerialNumber()) % broker.getUsageRecordLength();
       neededKWh = portfolioManager.collectUsage(index);
       submitOrder(neededKWh, timeslot.getSerialNumber());
+    }
+    if (startTimeSlot == 0){
+    	startTimeSlot = timeslotIndex;
+    	log.info("Setting the starttime " + startTimeSlot);
     }
   }
 
@@ -360,10 +397,45 @@ implements MarketManager, Initializable, Activatable
       double range = (minPrice - oldLimitPrice) * 2.0 / (double)remainingTries;
       log.debug("oldLimitPrice=" + oldLimitPrice + ", range=" + range);
       double computedPrice = oldLimitPrice + randomGen.nextDouble() * range; 
-      return Math.max(newLimitPrice, computedPrice);
+      newLimitPrice = Math.max(newLimitPrice, computedPrice);
     }
     else
       return null; // market order
+    
+	log.info("Compute limit price");
+		
+	int hours;
+    int days;
+    int weekday;
+    int simtimeslot = (timeslot - startTimeSlot);
+    hours = simtimeslot % 24;
+    days = simtimeslot / 24;
+    weekday = days % 7;
+    MarketClearingPrice marketClearingPrice = marketClearingPriceHistory.get(weekday);
+    if (marketClearingPrice == null){
+    	log.info("MarketClearning price null for weekday " + weekday + " No clearing price found from history at timeslot " + timeslot);
+    	return newLimitPrice;
+    }
+    else {
+    	double meanprice = marketClearingPrice.getMeanMarketClearingPrice(timeslot);
+    	if (meanprice == 0.0)
+    		meanprice = newLimitPrice;
+    	else
+    	{
+    		if (amountNeeded > 0.0) {
+		      // buying
+		      if(meanprice > 0)
+		    	  meanprice = meanprice * (-1);
+		    }
+		    else {
+		      // selling
+		      if(meanprice < 0)
+			   	  meanprice = meanprice * (-1);
+		    }
+    	}
+    	log.info("MarketClearning price "+ meanprice +" for weekday " + weekday + " Clearing price found from history XD at timeslot " + timeslot);
+    	return meanprice;
+    }      
   }
 }
 
@@ -402,4 +474,69 @@ class MarketRecord
 		this.totalEnergy += energy;
 	}
 	
+}
+
+class MarketClearingPrice {
+	static private Logger log = Logger.getLogger(MarketClearingPrice.class);
+	  
+	final int DayHours	= 24;
+	double marketClearingPricePerHour[][];
+	int startingTimeSlot;
+	
+	public MarketClearingPrice(){
+		this.marketClearingPricePerHour = new double[24][24];
+		//Arrays.fill(this.marketClearingPricePerHour, 0);
+		this.startingTimeSlot = 0;
+	}
+	
+	public MarketClearingPrice(int timeSlot) {
+		this.marketClearingPricePerHour = new double[24][24];
+		//Arrays.fill(this.marketClearingPricePerHour, 0);
+		this.startingTimeSlot = timeSlot;
+	}
+	
+	public double getMarketClearingPrice(int currentindex, int timeslotindex){
+		int hour;
+		int distancefromcurrenthour = timeslotindex - currentindex;
+		hour = (timeslotindex - this.startingTimeSlot) %  this.DayHours;
+		return this.marketClearingPricePerHour[hour][distancefromcurrenthour]; 
+	}
+	
+	
+	public double getMeanMarketClearingPrice(int timeslotindex)
+	{
+		int hour;
+		double meanprice = 0.0;
+		int pricecount = 0;
+		hour = (timeslotindex - this.startingTimeSlot) %  this.DayHours;
+		for (int i = 0; i < 24; i++){
+			if (this.marketClearingPricePerHour[hour][i] != 0)
+				pricecount++;
+			meanprice += this.marketClearingPricePerHour[hour][i];
+			//log.info("marketClearingPrice[" + hour +"][" + i +"] =" + this.marketClearingPricePerHour[hour][i]);
+		}
+		if (pricecount != 0)
+			meanprice = meanprice / pricecount;
+		else 
+			meanprice = 0;
+		return meanprice;
+	}
+	
+	public void printMarketClearingPrices(int timeslotindex)
+	{
+		int hour;
+		hour = (timeslotindex - this.startingTimeSlot) %  this.DayHours;
+		for (int i = 0; i < 24; i++){
+			log.info("marketClearingPrice[" + hour +"][" + i +"] =" + this.marketClearingPricePerHour[hour][i]);
+		}
+	}
+	
+	public void setMarketClearingPrice(int currenttimeslot, int timeslotindex, double price){
+		int hour;
+		int distancefromcurrenthour;
+		hour = (timeslotindex - this.startingTimeSlot) %  this.DayHours;
+		distancefromcurrenthour = timeslotindex - currenttimeslot;
+		this.marketClearingPricePerHour[hour][distancefromcurrenthour] = price;
+		log.info("marketClearingPrice[" + hour +"][" + distancefromcurrenthour + " = " + this.marketClearingPricePerHour[hour][distancefromcurrenthour]);
+	}
 }
